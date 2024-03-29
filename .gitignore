@@ -1,0 +1,7 @@
+# Ignore these please & thanks
+.env.secret
+venv/
+server.py
+rnl.py
+__pycache__/
+main.py
