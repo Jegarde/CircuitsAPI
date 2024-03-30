@@ -2,11 +2,14 @@ import asyncio
 import aiohttp
 import recnetpy
 import time
+import jwt
+from aiohttp.client_exceptions import ServerDisconnectedError
 from typing import Optional, List
 from dataclasses import dataclass
 from recnetpy.dataclasses.account import Account
 from .helpers import *
 from .exceptions import *
+from .request import Request
 
 
 @dataclass
@@ -15,7 +18,7 @@ class LoginCookie:
     session_token: str
 
 class Client:
-    def __init__(self, dev_token: str, rr_token: LoginCookie):
+    def __init__(self, dev_token: str, rr_token: LoginCookie, debug_mode: bool = False):
         # Dev token
         self.dev_token = dev_token
 
@@ -24,6 +27,11 @@ class Client:
             "Content-Type": "application/x-www-form-urlencoded"
         }
         self.cookies = {}
+        self.access_token = None
+        self.access_to_matchmaking = False
+
+        # host account ID
+        self.host_account_id = 0
 
         # Determine login method
         if isinstance(rr_token, LoginCookie):
@@ -32,11 +40,15 @@ class Client:
             self.cookie_method = True
         else:
             self.headers["Authorization"] = "Bearer " + rr_token
+            self.access_token = rr_token
             self.cookie_method = False
 
         # clients
         self.session: aiohttp.ClientSession | None = None
         self.RecNet: recnetpy.Client | None = None
+
+        # debug mode for printing
+        self.debug = debug_mode
 
         # Initialized
         self.initialized = False
@@ -50,20 +62,46 @@ class Client:
         # Check if logged in with cookie
         if self.cookie_method:
             # Get access token
-            resp = await self.session.get("https://rec.net/api/auth/session")
+            resp = await self.send_request("get", "https://rec.net/api/auth/session")
             data = await resp.json()
             token = data.get("accessToken")
             assert token, "Couldn't login!"
+            self.access_token = token
             self.session.headers["Authorization"] = "Bearer " + token
+
+        decoded_token = self.__decode_token(self.access_token)
+        self.host_account_id = int(decoded_token.get("sub", "0"))
+        self.access_to_matchmaking = "rn.match.read" in decoded_token.get("scope", [])
+
+        if not self.access_to_matchmaking:
+            print("WARNING: Your access token is lacking the 'rn.match.read' scope. This will limit functionality.")
 
         self.initialized = True
 
+    async def send_request(self, method: str, url: str, payload: str | dict = {}):
+        request = Request(self.session, method, url, payload)
+        return await request.send_request()
 
     async def connect_to_room(self, room: str | int):
         conn: RoomConnection = RoomConnection(room, self)
         await conn.initialize()
         return conn
     
+    def __decode_token(self, token: str) -> dict:
+        """Decodes a bearer token
+
+        Args:
+            token (str): A bearer token
+
+        Returns:
+            dict: Decoded bearer token
+        """
+        
+        decoded = jwt.decode(token, options={"verify_signature": False})
+        return decoded
+
+    async def db_print(self, *args) -> None:
+        if self.debug: print("Transmitter -", args)
 
     async def close(self) -> None:
         await self.session.close()
@@ -89,14 +127,37 @@ class RoomConnection:
 
 
     async def initialize(self):
-        resp = await self.session.get(f"https://rooms.rec.net/rooms/{self.room_id}/roles/")
+        resp = await self.client.send_request("get", f"https://rooms.rec.net/rooms/{self.room_id}/roles/")
         roles = await resp.json()
         if roles == []: raise RoomNotFound
+
+        # Make sure the user is privileged in the room so data can be transmitted
+        is_privileged = False
+        for i in roles:
+            if i["AccountId"] == self.client.host_account_id and i["Role"] in (255, 30):
+                is_privileged = True
+                break
+        
+        # Check if privileges found!
+        if not is_privileged:
+            raise InvalidRoomConnection
 
         self.roles = await resp.json()
         
 
     async def connect_to_user(self, user: str | int):
+        """Creates a connection to the specified user.
+
+        Args:
+            user (str | int): Username or ID
+
+        Raises:
+            UserNotFound: Raised if the user doesn't exist.
+            UserNotInRoom: Raised if the user is not in the room.
+
+        Returns:
+            UserConnection: Connection to the user.
+        """
         # Find user
         if isinstance(user, int):
             account = await self.RecNet.accounts.fetch(user)
@@ -104,12 +165,27 @@ class RoomConnection:
             account = await self.RecNet.accounts.get(user)
         if not account: raise UserNotFound
 
-        return UserConnection(account=account, room_connection=self)
+        conn = UserConnection(account=account, room_connection=self)
 
+        if self.client.access_to_matchmaking:
+            # Check if the player is in the room
+            if await conn.check_is_player_in_room():
+                return conn
+            else:
+                raise UserNotInRoom
+        else:
+            # Can't check if the player is in the room
+            return conn
+            
 
-    async def find_players(self) -> Optional[List[dict]]:
+    async def find_players(self) -> Optional[List[int]]:
+        """Searches for players in the room using room images taken in the past 10 minutes.
+
+        Returns:
+            Optional[List[int]]: List of found players' IDs.
+        """
         # Finds players in the room from images
-        resp = await self.session.get(f"https://apim.rec.net/apis/api/images/v4/room/{self.room_id}?take=10")
+        resp = await self.client.send_request("get", f"https://apim.rec.net/apis/api/images/v4/room/{self.room_id}?take=10")
         if resp.status != 200: return []
 
         # Find players in room from images
@@ -132,7 +208,6 @@ class RoomConnection:
         return player_ids
 
 
-
     async def close(self) -> None:
         await self.session.close()
         await self.RecNet.close()
@@ -142,6 +217,7 @@ class UserConnection:
     def __init__(self, account: Account, room_connection: RoomConnection):
         # Room connection
         self.room_conn = room_connection
+        self.client = self.room_conn.client
 
         # Room ID
         self.room_id = self.room_conn.room_id
@@ -155,8 +231,16 @@ class UserConnection:
         # previous role
         self.previous_role: int = self.__get_current_role()
 
+        # Check if the user is an owner or co-owner or the account transmitting data
+        if self.previous_role in ("255", "30"):
+            raise ConnectingToPrivilegedUser
+
         # available characters
         self.characters = supported_characters()
+
+        # is transmitting packets?
+        self.transmitting_packets = False
+        self.latest_bit_timestamp = 0  # For detecting timeouts
 
 
     # Packet Handler dependency functions
@@ -230,7 +314,7 @@ class UserConnection:
         matchmaking_state = instance.get("matchmakingPolicy")
 
         # Ping the user
-        await self.transmit_packet(0)
+        await self.__transmit_packet(0)
 
         # Wait for a response
         await asyncio.sleep(1)
@@ -278,13 +362,28 @@ class UserConnection:
         await self.__transmit_packet(binary)
 
 
+    async def check_is_player_in_room(self) -> bool:
+        """Returns True if connected player is in the connected room.
+
+        Returns:
+            bool: True if player is in the room
+        """
+        instance = await self.get_instance()
+        return instance and instance.get("roomId") == self.room_id
+
+
     async def get_instance(self) -> dict | None:
-        """Returns the instance connected players is in
+        """Returns the instance connected players is in.
 
         Returns:
             dict | None: Instance data if successful
         """
-        resp = await self.session.get(f"https://match.rec.net/player?id={self.account.id}")
+
+        # Check if the client can access matchmaking data
+        if not self.client.access_to_matchmaking:
+            raise LackingScope('rn.match.read')
+
+        resp = await self.client.send_request("get", f"https://match.rec.net/player?id={self.account.id}")
         if resp.status != 200: return None
         
         # Get user's current instance
@@ -297,7 +396,12 @@ class UserConnection:
 
     # Backend functions
 
-    def __get_current_role(self) -> int:
+    def __get_current_role(self) -> str:
+        """Returns the current role of the connected account
+
+        Returns:
+            str: Role ID as string
+        """
         for i in self.room_conn.roles:
             if i["AccountId"] == self.account.id:
                 return str(i["Role"])
@@ -305,6 +409,11 @@ class UserConnection:
     
 
     async def __transmit_packet(self, binary: int):
+        """Transmits a packet to the 'Packet Handler' circuit board. 
+
+        Args:
+            binary (int): Binary number to transmit
+        """
         bits = [*str(binary)]
         bits.reverse()
         for bit in bits:
@@ -313,10 +422,21 @@ class UserConnection:
 
 
     async def __transmit_packet_count(self, content_length: int):
+        """Signals the amount of packets in the payload to the 'Packet Handler' circuit board.
+        """
+
+        self.transmitting_packets = True
         await self.__transmit_packet(int(f"{content_length:b}"))
 
 
     async def __packet_completed(self) -> bool:
+        """Signals to the 'Packet Handler' circuit board that a packet was fully sent.
+
+        Returns:
+            bool: Was it successful?
+        """
+        self.transmitting_packets = False
+        self.latest_bit_timestamp = 0
         payload = "role="
 
         # Check if it's the same bit as before
@@ -328,10 +448,28 @@ class UserConnection:
         payload += role_id
         self.previous_role = role_id
 
-        resp = await self.session.put(f"https://rooms.rec.net/rooms/{self.room_id}/roles/{self.account.id}", data=payload)
+        resp = await self.client.send_request("put", f"https://rooms.rec.net/rooms/{self.room_id}/roles/{self.account.id}", payload=payload)
         return resp.status == 200
 
+
     async def __transmit_bit(self, bit: int) -> bool:
+        """Transmits a bit to the 'Receiver' circuit board
+
+        Args:
+            bit (int): Bit to transmit
+
+        Returns:
+            bool: Was it successful?
+        """
+
+        # Check if a possible payload was timed out
+        if self.transmitting_packets and self.latest_bit_timestamp != 0:
+            # Has it been over 10 seconds since the last bit was sent?
+            if self.latest_bit_timestamp - time.time() >= 10:
+                self.transmitting_packets = False
+                self.latest_bit_timestamp = 0
+                raise TimedOut
+
         bit_keys = {
             0: "20",
             1: "10"
@@ -358,5 +496,14 @@ class UserConnection:
         self.previous_role = role_id
 
         # Send signal to user
-        resp = await self.session.put(f"https://rooms.rec.net/rooms/{self.room_id}/roles/{self.account.id}", data=payload)
+        resp = await self.client.send_request("put", f"https://rooms.rec.net/rooms/{self.room_id}/roles/{self.account.id}", payload)
+
+        # Save the timestamp this bit was sent.
+        # If the next bit takes over 10 seconds to send, the payload has timed out in-game.
+        if self.transmitting_packets:
+            self.latest_bit_timestamp = time.time()
+
         return resp.status == 200
+    
+
+    
