@@ -13,8 +13,10 @@ You can only send a single bit at once. This system is not applicable for big da
 
 CV2 pongs require messing with the instance's matchmaking state.
 
+The circuits are currently made in Rooms v2. I am working on porting the circuits to Rooms v1 so it can be saved as an invention.
 
-## Usage
+
+## Setup
 1. Clone the template room.
 2. **IMPORTANT:** Remove any privileged permissions from the following roles from the room: host, moderator & contributor. Otherwise you may risk troublemakers abusing the privileges.
 3. Activate the 'Receiver' circuit board.
