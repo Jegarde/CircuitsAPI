@@ -19,6 +19,13 @@ class LoginCookie:
 
 class Client:
     def __init__(self, dev_token: str, rr_token: LoginCookie, debug_mode: bool = False):
+        """CV2 transmitter client that oversees all the connections.
+
+        Args:
+            dev_token (str): RR API token from devportal.rec.net
+            rr_token (LoginCookie): RR access token (ex. RecNet token)
+            debug_mode (bool, optional): Debug mode. Defaults to False.
+        """
         # Dev token
         self.dev_token = dev_token
 
@@ -54,6 +61,8 @@ class Client:
         self.initialized = False
 
     async def initialize(self):
+        """Initialize the client for usage. Must be ran.
+        """
         if self.initialized: return
         
         self.session = aiohttp.ClientSession(headers=self.headers, cookies=self.cookies)
@@ -83,6 +92,14 @@ class Client:
         return await request.send_request()
 
     async def connect_to_room(self, room: str | int):
+        """Create a connection to a room. You will then be able to target a specific user to transmit data.
+
+        Args:
+            room (str | int): Room name or ID
+
+        Returns:
+            RoomConnection: RoomConnection object
+        """
         conn: RoomConnection = RoomConnection(room, self)
         await conn.initialize()
         return conn
@@ -104,12 +121,21 @@ class Client:
         if self.debug: print("Transmitter -", args)
 
     async def close(self) -> None:
+        """Closes aiohttp and recnetpy sessions.
+        """
         await self.session.close()
         await self.RecNet.close()
 
 
 class RoomConnection:
     def __init__(self, room: str | int, client: Client):
+        """Class for connected rooms. It lets you connect to specific users to transmit data to.
+        This class should be generated via the client.
+
+        Args:
+            room (str | int): Room name or ID
+            client (Client): Master client
+        """
         self.client = client
 
         # Room ID to establish connection to
@@ -127,6 +153,12 @@ class RoomConnection:
 
 
     async def initialize(self):
+        """Initializes the room connection. Must be ran.
+
+        Raises:
+            RoomNotFound: Raised if the specified room doesn't exist or the user doesn't have permissions to it.
+            InvalidRoomConnection: Raised if the user is a co-owner or owner of the room.
+        """
         resp = await self.client.send_request("get", f"https://rooms.rec.net/rooms/{self.room_id}/roles/")
         roles = await resp.json()
         if roles == []: raise RoomNotFound
@@ -208,13 +240,17 @@ class RoomConnection:
         return player_ids
 
 
-    async def close(self) -> None:
-        await self.session.close()
-        await self.RecNet.close()
-
-
 class UserConnection:
     def __init__(self, account: Account, room_connection: RoomConnection):
+        """Connection to a specific user in a room. You will be able to transmit data to the connected user.
+
+        Args:
+            account (Account): Account dataclass from recnetpy
+            room_connection (RoomConnection): Initialized RoomConnection class.
+
+        Raises:
+            ConnectingToPrivilegedUser: Raised if you try to connect to an user who is a co-owner or owner of the room.
+        """
         # Room connection
         self.room_conn = room_connection
         self.client = self.room_conn.client
