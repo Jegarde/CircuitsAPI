@@ -6,3 +6,4 @@ rnl.py
 __pycache__/
 main.py
 promo.*
+db.txt
