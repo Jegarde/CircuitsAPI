@@ -1,5 +1,8 @@
 ![promo image](https://i.imgur.com/sk1KyTT.png)
 
+## THIS PROJECT IS IN PRE-ALPHA STAGE
+This system has not been properly tested. It is constantly being updated with breaking changes. Do not use this system in a production environment. Only use it for testing and experimenting.
+
 ## What is this?
 A system to communicate with CV2 using Python.
 
