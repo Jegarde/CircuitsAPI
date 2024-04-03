@@ -36,7 +36,7 @@ class Request:
 
             print("Server disconnected, attempting again...")
             self.attempts += 1
-            resp = await self.send_request(self.method, self.url, self.payload)
+            resp = await self.send_request()
         except Exception as e:
             # Unhandled error
             print(f"Error sending request METHOD: {self.method} URL: {self.url} PAYLOAD: {self.payload}")
