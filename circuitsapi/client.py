@@ -3,27 +3,26 @@ import aiohttp
 import recnetpy
 import time
 import jwt
-from aiohttp.client_exceptions import ServerDisconnectedError
 from typing import Optional, List
 from dataclasses import dataclass
 from recnetpy.dataclasses.account import Account
 from .helpers import *
 from .exceptions import *
 from .request import Request
+from .recnetlogin import RecNetLogin
 
 
 @dataclass
 class LoginCookie:
-    csrf_token: str
     session_token: str
 
 class Client:
-    def __init__(self, dev_token: str, rr_token: LoginCookie, debug_mode: bool = False):
+    def __init__(self, dev_token: str, rr_auth: str | LoginCookie | None = None, debug_mode: bool = False):
         """CV2 transmitter client that oversees all the connections.
 
         Args:
             dev_token (str): RR API token from devportal.rec.net
-            rr_token (LoginCookie): RR access token (ex. RecNet token)
+            rr_auth (str | LoginCookie | None): RR access token, cookie or nothing. If left empty, defaults to RecNetLogin.
             debug_mode (bool, optional): Debug mode. Defaults to False.
         """
         # Dev token
@@ -41,18 +40,26 @@ class Client:
         self.host_account_id = 0
 
         # Determine login method
-        if isinstance(rr_token, LoginCookie):
+        if isinstance(rr_auth, LoginCookie):
             # Cookie login method
-            self.cookies = {"__Host-next-auth.csrf-token": rr_token.csrf_token, "__Secure-next-auth.session-token": rr_token.session_token}
+            self.cookies = {"__Secure-next-auth.session-token": rr_auth.session_token}
             self.cookie_method = True
+        elif isinstance(rr_auth, str):
+            self.headers["Authorization"] = "Bearer " + rr_auth
+            self.access_token = rr_auth
+            self.cookie_method = False
         else:
-            self.headers["Authorization"] = "Bearer " + rr_token
-            self.access_token = rr_token
+            # Attempt to login with RecNetLogin
+            rnl = RecNetLogin()
+            token = rnl.get_token()
+            self.headers["Authorization"] = "Bearer " + token
+            self.access_token = token
             self.cookie_method = False
 
         # clients
         self.session: aiohttp.ClientSession | None = None
         self.RecNet: recnetpy.Client | None = None
+        self.auth_task: asyncio.Task = None
 
         # debug mode for printing
         self.debug = debug_mode
@@ -70,14 +77,20 @@ class Client:
 
         # Check if logged in with cookie
         if self.cookie_method:
-            # Get access token
-            resp = await self.send_request("get", "https://rec.net/api/auth/session")
-            data = await resp.json()
-            token = data.get("accessToken")
-            assert token, "Couldn't login!"
-            self.access_token = token
-            self.session.headers["Authorization"] = "Bearer " + token
+            # Get CSRF token
+            if "__Host-next-auth.csrf-token" not in self.cookies:
+                resp = await self.send_request("get", "https://rec.net/api/auth/csrf")
+                data = await resp.json()
+                csrf = data["csrfToken"]
+                self.cookies["__Host-next-auth.csrf-token"] = csrf
 
+            # connect and get token
+            await self.connect_auth()
+
+        # Wait for auth
+        while True: 
+            if self.access_token: break
+            
         decoded_token = self.__decode_token(self.access_token)
         self.host_account_id = int(decoded_token.get("sub", "0"))
         self.access_to_matchmaking = "rn.match.read" in decoded_token.get("scope", [])
@@ -86,6 +99,29 @@ class Client:
             print("WARNING: Your access token is lacking the 'rn.match.read' scope. This will limit functionality.")
 
         self.initialized = True
+        
+
+    async def connect_auth(self):
+        # Get access token
+        resp = await self.send_request("get", "https://rec.net/api/auth/session")
+        data = await resp.json()
+        token = data.get("accessToken")
+        assert token, "Couldn't login!"
+        self.access_token = token
+        self.session.headers["Authorization"] = "Bearer " + token
+
+
+    async def maintain_auth(self):
+        """This function refreshes the auth token and token.
+        """
+        # loop forever
+        while True:
+            # wait an interval
+            await asyncio.sleep(60)
+
+            # Get access token
+            await self.connect_auth()
+
 
     async def send_request(self, method: str, url: str, payload: str | dict = {}):
         request = Request(self.session, method, url, payload)
@@ -122,12 +158,21 @@ class Client:
     async def db_print(self, *args) -> None:
         if self.debug: print("Transmitter -", args)
 
+    # asynchronous context manager enter
+    async def __aenter__(self):
+        await self.initialize()
+        return self
+
+    # asynchronous context manager exit
+    async def __aexit__(self, *args):
+        await self.close()
+
     async def close(self) -> None:
         """Closes aiohttp and recnetpy sessions.
         """
         await self.session.close()
         await self.RecNet.close()
-
+        #await self.auth_task.cancel()
 
 class RoomConnection:
     def __init__(self, room: str | int, client: Client):
@@ -140,14 +185,22 @@ class RoomConnection:
         """
         self.client = client
 
-        # Room ID to establish connection to
-        self.room_id = room                                     
+        # Room ID or name to establish connection to
+        if isinstance(room, str):
+            self.room_id = None
+            self.room_name = room
+        else:
+            self.room_id = room
+            self.room_name = None                                     
 
         # Dev token
         self.dev_token = self.client.dev_token
 
         # Roles
         self.roles = {}
+
+        # Supported room
+        self.supports_circuitsapi = False
 
         # clients
         self.session: aiohttp.ClientSession = self.client.session
@@ -161,13 +214,31 @@ class RoomConnection:
             RoomNotFound: Raised if the specified room doesn't exist or the user doesn't have permissions to it.
             InvalidRoomConnection: Raised if the user is a co-owner or owner of the room.
         """
-        resp = await self.client.send_request("get", f"https://rooms.rec.net/rooms/{self.room_id}/roles/")
-        roles = await resp.json()
-        if roles == []: raise RoomNotFound
+        if self.room_name:
+            resp = await self.client.send_request("get", f"https://rooms.rec.net/rooms/?name={self.room_name}&include=12")
+        elif self.room_id:
+            resp = await self.client.send_request("get", f"https://rooms.rec.net/rooms/{self.room_id}&include=12")
+
+        if resp.status != 200:
+            raise RoomNotFound
+
+        room = await resp.json()
+        self.roles = room["Roles"]
+        self.room_id = room['RoomId']
+        self.room_name = room['Name']
+        tags = room["Tags"]
+
+        # Check if the room is officially supported
+        for i in tags:
+            if i["Tag"].lower() == "circuitsapi":
+                self.supports_circuitsapi = True
+                break
+        if not self.supports_circuitsapi:
+            print(f"WARNING: ^{room['Name']} lacks the tag 'circuitsapi'. Is it supported?")
 
         # Make sure the user is privileged in the room so data can be transmitted
         is_privileged = False
-        for i in roles:
+        for i in self.roles:
             if i["AccountId"] == self.client.host_account_id and i["Role"] in (255, 30):
                 is_privileged = True
                 break
@@ -175,8 +246,6 @@ class RoomConnection:
         # Check if privileges found!
         if not is_privileged:
             raise InvalidRoomConnection
-
-        self.roles = await resp.json()
         
 
     async def connect_to_user(self, user: str | int):
@@ -195,8 +264,10 @@ class RoomConnection:
         # Find user
         if isinstance(user, int):
             account = await self.RecNet.accounts.fetch(user)
-        else:
+        elif isinstance(user, str):
             account = await self.RecNet.accounts.get(user)
+        else:
+            account = None
         if not account: raise UserNotFound
 
         conn = UserConnection(account=account, room_connection=self)
