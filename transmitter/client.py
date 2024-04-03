@@ -89,7 +89,9 @@ class Client:
 
     async def send_request(self, method: str, url: str, payload: str | dict = {}):
         request = Request(self.session, method, url, payload)
-        return await request.send_request()
+        response = await request.send_request()
+        print(f"{method.upper()} {url} DATA: {payload} - {response.status}")
+        return response
 
     async def connect_to_room(self, room: str | int):
         """Create a connection to a room. You will then be able to target a specific user to transmit data.
