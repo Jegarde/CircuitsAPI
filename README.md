@@ -17,7 +17,11 @@ A system to communicate with CV2 using Python.
   - It will be ported over to Rooms v1 once it's stable enough.
 
 ## Installation
+The recommended method is installing via [pip](https://pypi.org/project/pip/).
+
 `pip install -U circuitsapi`
+
+For instructions on installing Python and pip, see [The Hitchhiker's Guide to Python](https://docs.python-guide.org/starting/installation/).
 
 ## Setup
 Clone the template room: https://rec.net/room/CircuitsAPI.
