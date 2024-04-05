@@ -8,6 +8,11 @@ Detailed documentation coming later.
 ## What is this?
 A system to communicate with CV2 using Python.
 
+<img src="https://github.com/Jegarde/CircuitsAPI/assets/13438202/fad38801-641f-439f-ab36-249bc22d08e9" width="400">
+<img src="https://github.com/Jegarde/CircuitsAPI/assets/13438202/70d09f93-8f40-4dff-8c26-f1577d91ba6f" width="350">
+
+
+
 ## Limitations
 - You must sacrifice the following permission roles: host, moderator & contributor. Co-owner will be the only role you can grant others without triggering the system. 
 - Room owner & co-owners will not be able to receive data by this system.
@@ -47,16 +52,18 @@ async def main():
         # Connect to a specific user to send data to
         user = await room.connect_to_user(user="Jegarde")  # You can also use the account ID
     
+        # Send signals to the receiver ports
+        await user.send_bit_1()
+        await user.send_bit_0()
+        await user.send_end_signal()
+
         # Send binary
         await user.send_binary(101101)
-    
-        # Send signals to the receiver ports
-        await user.send_bit_0()
-        await user.send_bit_1()
-        await user.send_end_signal()
 
 asyncio.run(main())
 ```
+
+<img src="https://github.com/Jegarde/CircuitsAPI/assets/13438202/6ed9b3b4-a14f-4ef2-8a8b-79d76fa0e29f" height="300">
 
 Here's the functions you can use if you hook up the in-game 'Receiver' to the 'Packet Handler':
 ```py
