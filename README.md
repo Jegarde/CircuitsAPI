@@ -3,10 +3,15 @@
 ## THIS PROJECT IS IN PRE-ALPHA STAGE
 This system has not been properly tested. It is constantly being updated with breaking changes. Do not use this system in a production environment. Only use it for testing and experimenting.
 
-Detailed documentation coming later.
+Detailed documentation and instructions coming later.
+
+Feel free to contact @Jegarde on Discord for inquiries.
 
 ## What is this?
 A system to communicate with CV2 using Python.
+
+<img src="https://github.com/Jegarde/CircuitsAPI/assets/13438202/fad38801-641f-439f-ab36-249bc22d08e9" width="400">
+<img src="https://github.com/Jegarde/CircuitsAPI/assets/13438202/70d09f93-8f40-4dff-8c26-f1577d91ba6f" width="350">
 
 ## Limitations
 - You must sacrifice the following permission roles: host, moderator & contributor. Co-owner will be the only role you can grant others without triggering the system. 
@@ -47,16 +52,18 @@ async def main():
         # Connect to a specific user to send data to
         user = await room.connect_to_user(user="Jegarde")  # You can also use the account ID
     
+        # Send signals to the receiver ports
+        await user.send_bit_1()
+        await user.send_bit_0()
+        await user.send_end_signal()
+
         # Send binary
         await user.send_binary(101101)
-    
-        # Send signals to the receiver ports
-        await user.send_bit_0()
-        await user.send_bit_1()
-        await user.send_end_signal()
 
 asyncio.run(main())
 ```
+
+<img src="https://github.com/Jegarde/CircuitsAPI/assets/13438202/6ed9b3b4-a14f-4ef2-8a8b-79d76fa0e29f" height="300">
 
 Here's the functions you can use if you hook up the in-game 'Receiver' to the 'Packet Handler':
 ```py
@@ -86,6 +93,33 @@ await user.get_instance()
 # If you want to connect to users, you can ask them to take pictures and have the server check for those pictures
 await room.find_players()
 ```
+
+## Example Usage
+This [example script](https://github.com/Jegarde/CircuitsAPI/blob/pre-alpha/examples/helloworld.py) is compatible with the [template room](https://rec.net/room/CircuitsAPI).
+
+## Experimentative Features
+
+### Run-length encoding
+You can compress data with [run-length encoding](https://en.wikipedia.org/wiki/Run-length_encoding).
+
+Ex. "aaabbbceeeeee" -> "3a3b1c6e"
+
+This is only efficient if the data has lots of repetition.
+
+```py
+# Shortened code
+from circuitsapi import run_length_encoding
+await user.send_text_packet(run_length_encoding("aaabbbccc"))  # encodes to 3a3b3c
+```
+
+In-game decoder:
+
+<img src="https://github.com/Jegarde/CircuitsAPI/assets/13438202/6005cf1e-7ae0-475a-9e9c-d5a2fcfecbf5" height="200">
+
+<img src="https://github.com/Jegarde/CircuitsAPI/assets/13438202/b025e943-971d-4f90-9cd1-f49d04786ec9" height="200">
+
+
+
 
 ## How does this work?
 There's CV2 chips for checking if a player is a host, mod or a contributor and you can modify a player's roles through the API. This allows us to send remote signals to the specified player while CV2 is constantly checking for each players' roles.
