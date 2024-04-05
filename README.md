@@ -1,4 +1,4 @@
-![promo image](https://i.imgur.com/sk1KyTT.png)
+![promo](https://github.com/Jegarde/CircuitsAPI/assets/13438202/554a02af-6862-44d9-aa80-da78fccdb409)
 
 ## THIS PROJECT IS IN PRE-ALPHA STAGE
 This system has not been properly tested. It is constantly being updated with breaking changes. Do not use this system in a production environment. Only use it for testing and experimenting.
