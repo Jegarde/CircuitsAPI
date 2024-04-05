@@ -94,6 +94,30 @@ await user.get_instance()
 await room.find_players()
 ```
 
+## Experimentative Features
+
+### Run-length encoding
+You can compress data with [run-length encoding](https://en.wikipedia.org/wiki/Run-length_encoding).
+
+Ex. "aaabbbceeeeee" -> "3a3b1c6e"
+
+This is only efficient if the data has lots of repetition.
+
+```py
+# Shortened code
+from circuitsapi import run_length_encoding
+await user.send_text_packet(run_length_encoding("aaabbbccc"))  # encodes to 3a3b3c
+```
+
+In-game decoder:
+
+<img src="https://github.com/Jegarde/CircuitsAPI/assets/13438202/6005cf1e-7ae0-475a-9e9c-d5a2fcfecbf5" height="200">
+
+<img src="https://github.com/Jegarde/CircuitsAPI/assets/13438202/b025e943-971d-4f90-9cd1-f49d04786ec9" height="200">
+
+
+
+
 ## How does this work?
 There's CV2 chips for checking if a player is a host, mod or a contributor and you can modify a player's roles through the API. This allows us to send remote signals to the specified player while CV2 is constantly checking for each players' roles.
 
