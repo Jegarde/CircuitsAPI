@@ -3,9 +3,10 @@
 ## THIS PROJECT IS IN PRE-ALPHA STAGE
 This system has not been properly tested. It is constantly being updated with breaking changes. Do not use this system in a production environment. Only use it for testing and experimenting.
 
+Detailed documentation coming later.
+
 ## What is this?
 A system to communicate with CV2 using Python.
-
 
 ## Limitations
 - You must sacrifice the following permission roles: host, moderator & contributor. Co-owner will be the only role you can grant others without triggering the system. 
@@ -15,47 +16,47 @@ A system to communicate with CV2 using Python.
 - The circuits are currently made in Rooms v2 to prevent the system being used in existing production rooms due to instability.
   - It will be ported over to Rooms v1 once it's stable enough.
 
-## Rec Room Setup
-1. Clone the template room: https://rec.net/room/CircuitsAPI.
-2. **IMPORTANT:** Remove any privileged permissions from the following roles from the room: host, moderator & contributor. Otherwise you may risk troublemakers abusing the privileges.
-3. Add `circuitsapi` as a room tag to indicate it's supported by the system.
-4. Activate the 'Receiver' circuit board.
-
 ## Installation
 `pip install -U circuitsapi`
 
 ## Setup
+Clone the template room: https://rec.net/room/CircuitsAPI.
+
 Request a developer key from https://devportal.rec.net/. This will be passed as the `dev_token` argument in the client.
 
 Setup RecNetLogin: https://github.com/Jegarde/RecNet-Login/?tab=readme-ov-file#setup.
 
 ## Quickstart
-Here's the basics of setting up the client:
+Here's the basics of setting up the client: 
 ```py
 import circuitsapi
+import asyncio
 
-# Let's initialize the CircuitsAPI client!
-# dev_token is the developer key from https://devportal.rec.net/.
-# rr_auth is the RecNet access token. If left empty, CircuitsAPI defaults to RecNetLogin: https://github.com/Jegarde/RecNet-Login/
-async with circuitsapi.Client(dev_token="", rr_auth=None) as client:
-    # Connect to a supported room
-    room = await client.connect_to_room(room="CircuitsAPI")  # You can also use the room ID
+async def main():
+    # Let's initialize the CircuitsAPI client!
+    # dev_token is the developer key from https://devportal.rec.net/.
+    # rr_auth is the RecNet access token. If left empty, CircuitsAPI defaults to RecNetLogin: https://github.com/Jegarde/RecNet-Login/
+    async with circuitsapi.Client(dev_token="", rr_auth=None) as client:
+        # Connect to a supported room
+        room = await client.connect_to_room(room="CircuitsAPI")  # You can also use the room ID
+    
+        # Connect to a specific user to send data to
+        user = await room.connect_to_user(user="Jegarde")  # You can also use the account ID
+    
+        # Send binary
+        await user.send_binary(101101)
+    
+        # Send signals to the receiver ports
+        await user.send_bit_0()
+        await user.send_bit_1()
+        await user.send_end_signal()
 
-    # Connect to a specific user to send data to
-    user = await room.connect_to_user(user="Jegarde")  # You can also use the account ID
-
-    # Send binary
-    await user.send_binary(101101)
-
-    # Send signals to the receiver ports
-    await user.send_bit_0()
-    await user.send_bit_1()
-    await user.send_end_signal()
+asyncio.run(main())
 ```
 
 Here's the functions you can use if you hook up the in-game 'Receiver' to the 'Packet Handler':
 ```py
-# Assuming you have connected to an user
+# Assuming you are connected to an user
 
 # Sending text
 await user.send_text_packet("Hello, World!")
@@ -74,6 +75,7 @@ Here's some miscellaneous functions:
 await user.check_is_player_in_room()
 
 # Returns the player's room instance data
+# Requires 'rn.match.read' scope in access token.
 await user.get_instance()
 
 # Returns player IDs of those who have taken images in the past 10 minutes
