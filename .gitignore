@@ -11,3 +11,4 @@ db.txt
 *.tar.gz
 promo*
 *.egg-info
+images/
