@@ -36,7 +36,6 @@ class Client:
         self.host_account_id = 0
 
         # Determine login method
-        self.used_recnetlogin = False
         if isinstance(rr_auth, str):
             self.headers["Authorization"] = "Bearer " + rr_auth
             self.access_token = rr_auth
@@ -46,7 +45,6 @@ class Client:
             token = rnl.get_token()
             self.headers["Authorization"] = "Bearer " + token
             self.access_token = token
-            self.used_recnetlogin = True
 
         # clients
         self.session: aiohttp.ClientSession | None = None
@@ -64,23 +62,32 @@ class Client:
         """
         if self.initialized: return
         
+        # Initialize aiohttp and recnetpy
         self.session = aiohttp.ClientSession(headers=self.headers, cookies=self.cookies)
         self.RecNet = recnetpy.Client(api_key=self.dev_token)
-
-        # Wait for auth
-        while True: 
-            if self.access_token: break
             
+        # Read token properties
         decoded_token = self.__decode_token(self.access_token)
         self.host_account_id = int(decoded_token.get("sub", "0"))
         self.access_to_matchmaking = "rn.match.read" in decoded_token.get("scope", [])
 
+        # Matchmaking data lets you access room instances.
         if not self.access_to_matchmaking:
             print("WARNING: Your access token is lacking the 'rn.match.read' scope. This will limit functionality.")
 
         self.initialized = True
 
-    async def send_request(self, method: str, url: str, payload: str | dict = {}):
+    async def send_request(self, method: str, url: str, payload: str | dict = {}) -> aiohttp.ClientResponse:
+        """Sends an API request
+
+        Args:
+            method (str): Request method
+            url (str): Request URL
+            payload (str | dict, optional): Request payload. Defaults to {}.
+
+        Returns:
+            aiohttp.ClientResponse: aiohttp response
+        """
         request = Request(self.session, method, url, payload)
         response = await request.send_request()
         print(f"{method.upper()} {url} DATA: {payload} - {response.status}")
@@ -111,9 +118,6 @@ class Client:
         
         decoded = jwt.decode(token, options={"verify_signature": False})
         return decoded
-
-    async def db_print(self, *args) -> None:
-        if self.debug: print("Transmitter -", args)
 
     # asynchronous context manager enter
     async def __aenter__(self):
