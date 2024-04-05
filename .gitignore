@@ -7,3 +7,7 @@ __pycache__/
 main.py
 promo.*
 db.txt
+*.whl
+*.tar.gz
+promo*
+*.egg-info
