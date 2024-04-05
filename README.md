@@ -124,7 +124,7 @@ In-game decoder:
 ## How does this work?
 There's CV2 chips for checking if a player is a host, mod or a contributor and you can modify a player's roles through the API. This allows us to send remote signals to the specified player while CV2 is constantly checking for each players' roles.
 
-RR Transmitter uses the following signals:
+CircuitsAPI uses the following signals:
 ```
 Host = Add on bit
 Mod = Add off bit
