@@ -8,20 +8,17 @@ A system to communicate with CV2 using Python.
 
 
 ## Limitations
-You must sacrifice the following permission roles: host, moderator & contributor. Co-owner will be the only role you can grant others without triggering the system. 
-
-Room owner & co-owners will not be able to receive data by this system.
-
-You can only send a single bit at once. This system is not applicable for big data transmissions.
-
-CV2 pongs require messing with the instance's matchmaking state.
-
-The circuits are currently made in Rooms v2. I am working on porting the circuits to Rooms v1 so it can be saved as an invention.
+- You must sacrifice the following permission roles: host, moderator & contributor. Co-owner will be the only role you can grant others without triggering the system. 
+- Room owner & co-owners will not be able to receive data by this system.
+- You can only send a single bit at once. This system is not applicable for big data transmissions.
+- CV2 pongs require messing with the instance's matchmaking state.
+- The circuits are currently made in Rooms v2 to prevent the system being used in existing production rooms due to instability.
+  - It will be ported over to Rooms v1 once it's stable enough.
 
 ## Rec Room Setup
 1. Clone the template room: https://rec.net/room/CircuitsAPI.
 2. **IMPORTANT:** Remove any privileged permissions from the following roles from the room: host, moderator & contributor. Otherwise you may risk troublemakers abusing the privileges.
-3. Add `circuitsapi` as a room tag to indicate it's supported.
+3. Add `circuitsapi` as a room tag to indicate it's supported by the system.
 4. Activate the 'Receiver' circuit board.
 
 ## Installation
@@ -29,8 +26,10 @@ The circuits are currently made in Rooms v2. I am working on porting the circuit
 2. Install the Python requirements. `pip install -U -r requirements.txt`
 3. Include the `circuitsapi` directory in your project. That is the library.
 
-## API Key
-Request a developer key from https://devportal.rec.net/.
+## Setup
+Request a developer key from https://devportal.rec.net/. This will be passed as the `dev_token` argument in the client.
+
+Setup RecNetLogin: https://github.com/Jegarde/RecNet-Login/?tab=readme-ov-file#setup.
 
 ## Quickstart
 Here's the basics of setting up the client:
@@ -40,7 +39,7 @@ import circuitsapi
 # Let's initialize the CircuitsAPI client!
 # dev_token is the developer key from https://devportal.rec.net/.
 # rr_auth is the RecNet access token. If left empty, CircuitsAPI defaults to RecNetLogin: https://github.com/Jegarde/RecNet-Login/
-async with circuitsapi.Client(dev_token="", rr_auth="") as client:
+async with circuitsapi.Client(dev_token="", rr_auth=None) as client:
     # Connect to a supported room
     room = await client.connect_to_room(room="CircuitsAPI")  # You can also use the room ID
 
