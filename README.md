@@ -22,9 +22,7 @@ A system to communicate with CV2 using Python.
 4. Activate the 'Receiver' circuit board.
 
 ## Installation
-1. Download and unpack the [repository](https://github.com/Jegarde/CircuitsAPI/archive/refs/heads/pre-alpha.zip).
-2. Install the Python requirements. `pip install -U -r requirements.txt`
-3. Include the `circuitsapi` directory in your project. That is the library.
+`pip install -U circuitsapi`
 
 ## Setup
 Request a developer key from https://devportal.rec.net/. This will be passed as the `dev_token` argument in the client.
