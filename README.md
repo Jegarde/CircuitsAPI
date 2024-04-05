@@ -20,9 +20,10 @@ The circuits are currently made in Rooms v2. I am working on porting the circuit
 
 
 ## Setup
-1. Clone the template room.
+1. Clone the template room: https://rec.net/room/CircuitsAPI.
 2. **IMPORTANT:** Remove any privileged permissions from the following roles from the room: host, moderator & contributor. Otherwise you may risk troublemakers abusing the privileges.
-3. Activate the 'Receiver' circuit board.
+3. Add `circuitsapi` as a room tag to indicate it's supported.
+4. Activate the 'Receiver' circuit board.
 
 
 ## How does this work?
