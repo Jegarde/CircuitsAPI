@@ -3,3 +3,4 @@ python-dotenv==1.0.0
 aiohttp==3.9.2
 recnetpy==0.2.71
 python-dateutil==2.8.2
+recnetlogin==0.1.1

@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "circuitsapi"
+version = "0.0.2"
+authors = [
+    { name="Jegarde"}
+]
+description = "CircuitsAPI is a system to transmit data to Rec Room circuits."
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "PyJWT==2.7.0",
+    "python-dotenv==1.0.0",
+    "aiohttp==3.9.2",
+    "recnetpy==0.2.71",
+    "python-dateutil==2.8.2",
+    "recnetlogin==0.1.1"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/Jegarde/CircuitsAPI"
+"Bug Tracker" = "https://github.com/Jegarde/CircuitsAPI/issues"
