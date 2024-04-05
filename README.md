@@ -3,15 +3,15 @@
 ## THIS PROJECT IS IN PRE-ALPHA STAGE
 This system has not been properly tested. It is constantly being updated with breaking changes. Do not use this system in a production environment. Only use it for testing and experimenting.
 
-Detailed documentation coming later.
+Detailed documentation and instructions coming later.
+
+Feel free to contact @Jegarde on Discord for inquiries.
 
 ## What is this?
 A system to communicate with CV2 using Python.
 
 <img src="https://github.com/Jegarde/CircuitsAPI/assets/13438202/fad38801-641f-439f-ab36-249bc22d08e9" width="400">
 <img src="https://github.com/Jegarde/CircuitsAPI/assets/13438202/70d09f93-8f40-4dff-8c26-f1577d91ba6f" width="350">
-
-
 
 ## Limitations
 - You must sacrifice the following permission roles: host, moderator & contributor. Co-owner will be the only role you can grant others without triggering the system. 
@@ -93,6 +93,9 @@ await user.get_instance()
 # If you want to connect to users, you can ask them to take pictures and have the server check for those pictures
 await room.find_players()
 ```
+
+## Example Usage
+This [example script](https://github.com/Jegarde/CircuitsAPI/blob/pre-alpha/examples/helloworld.py) is compatible with the [template room](https://rec.net/room/CircuitsAPI).
 
 ## Experimentative Features
 
