@@ -97,7 +97,7 @@ await room.find_players()
 ## Example Usage
 This [example script](https://github.com/Jegarde/CircuitsAPI/blob/pre-alpha/examples/helloworld.py) is compatible with the [template room](https://rec.net/room/CircuitsAPI).
 
-## Experimentative Features
+## Experimental Features
 
 ### Run-length encoding
 You can compress data with [run-length encoding](https://en.wikipedia.org/wiki/Run-length_encoding).
