@@ -419,7 +419,7 @@ class UserConnection:
         """Executes 'END' port in 'Receiver' circuit board
         """
 
-        await self.__packet_completed(self)
+        await self.__packet_completed()
                 
 
     async def send_binary(self, binary: int):
