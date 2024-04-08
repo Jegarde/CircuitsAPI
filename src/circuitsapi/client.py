@@ -178,7 +178,7 @@ class RoomConnection:
         if self.room_name:
             resp = await self.client.send_request("get", f"https://rooms.rec.net/rooms/?name={self.room_name}&include=12")
         elif self.room_id:
-            resp = await self.client.send_request("get", f"https://rooms.rec.net/rooms/{self.room_id}&include=12")
+            resp = await self.client.send_request("get", f"https://rooms.rec.net/rooms/{self.room_id}?include=12")
 
         if resp.status != 200:
             raise RoomNotFound
